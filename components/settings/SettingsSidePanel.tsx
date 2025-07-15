@@ -2,13 +2,14 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../src/store/store';
 import { SettingsFeaturesProps, MockData, Client, Hotel, Collaborator, Request as AppRequest, HistoryRequest, Rota, ClientObservacoes, AttachmentFile, Diaria, Vehicle, StockItem, StockHistoryItem } from '../../types';
-import { Modal, Download as DownloadIconOriginal, Upload as UploadIconOriginal, XIcon, Wrench } from '../../App'; 
+import { Modal, Download as DownloadIconOriginal, Upload as UploadIconOriginal, XIcon, Wrench, DatabaseIcon } from '../../App'; 
 
 import LocationForm from './LocationForm';
 import SupportPanel from './SupportPanel';
 import ImportWizardContent from './ImportWizardContent';
 import SettingsSection from './SettingsSection'; 
 import PdfSettingsForm from '../stock/PdfSettingsForm';
+import DatabaseHealthCheck from './DatabaseHealthCheck';
 
 
 interface SettingsSidePanelProps extends SettingsFeaturesProps {
@@ -36,6 +37,7 @@ const SettingsSidePanel: React.FC<SettingsSidePanelProps> = ({ addNotification, 
     const [showLocationForm, setShowLocationForm] = useState(false);
     const [showImportWizard, setShowImportWizard] = useState(false);
     const [showPdfSettings, setShowPdfSettings] = useState(false);
+    const [showDbHealth, setShowDbHealth] = useState(false);
 
     const panelRef = useRef<HTMLDivElement>(null);
     const [isClosing, setIsClosing] = useState(false);
@@ -50,11 +52,11 @@ const SettingsSidePanel: React.FC<SettingsSidePanelProps> = ({ addNotification, 
             if (event.key === 'Escape') handleClose();
         };
         // Prevent panel from closing when a modal is open
-        if (!showLocationForm && !showImportWizard && !showPdfSettings) {
+        if (!showLocationForm && !showImportWizard && !showPdfSettings && !showDbHealth) {
             document.addEventListener('keydown', handleKeyDown);
         }
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [handleClose, showLocationForm, showImportWizard, showPdfSettings]);
+    }, [handleClose, showLocationForm, showImportWizard, showPdfSettings, showDbHealth]);
     
     const handleExportFullData = useCallback(() => {
         if (typeof window.XLSX === 'undefined') {
@@ -127,7 +129,13 @@ const SettingsSidePanel: React.FC<SettingsSidePanelProps> = ({ addNotification, 
                     </button>
                 </header>
                 <main className="flex-grow p-4 sm:p-6 overflow-y-auto space-y-6">
-                     <SettingsSection title="Configurações de Rota" description="Defina as filiais para cálculo de distância.">
+                    <SettingsSection title="Diagnóstico" description="Verificar a saúde e performance da base de dados.">
+                        <button onClick={() => setShowDbHealth(true)} className="w-full bg-yellow-100 hover:bg-yellow-200 text-yellow-800 font-semibold p-3 rounded-lg flex items-center justify-center space-x-2">
+                            <DatabaseIcon size={18}/>
+                            <span>Verificar Base de Dados</span>
+                        </button>
+                    </SettingsSection>
+                    <SettingsSection title="Configurações de Rota" description="Defina as filiais para cálculo de distância.">
                         <button onClick={() => setShowLocationForm(true)} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold p-3 rounded-lg flex items-center justify-center space-x-2">
                            Gerenciar Rotas
                         </button>
@@ -167,6 +175,12 @@ const SettingsSidePanel: React.FC<SettingsSidePanelProps> = ({ addNotification, 
                 <Modal title="Configurar PDF do Recibo" onClose={() => setShowPdfSettings(false)} zIndex={60}>
                     <PdfSettingsForm currentSettings={pdfSettings} addNotification={addNotification} onFinished={() => setShowPdfSettings(false)} />
                 </Modal>
+            )}
+            {showDbHealth && (
+                <DatabaseHealthCheck
+                    addNotification={addNotification}
+                    onClose={() => setShowDbHealth(false)}
+                />
             )}
         </>
     );

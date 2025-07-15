@@ -8,6 +8,7 @@
 
 
 
+
 import React, { createContext, useContext, ReactNode, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Routes, Route, useNavigate, Link, useLocation, NavLink, Navigate } from 'react-router-dom';
@@ -52,7 +53,7 @@ import {
   Paperclip, RefreshCw, FilePlus, CheckCircle, AlertTriangle, Eye, Upload, Briefcase, RotateCcw,
   FileText as FileTextIcon,
   Users, X, Wrench, Download, Square, CheckSquare, FileText,
-  Settings as SettingsIcon, Home, DollarSign, Archive, LogOut, ArrowLeft, ClipboardCopy, Menu, Truck, Building2
+  Settings as SettingsIcon, Home, DollarSign, Archive, LogOut, ArrowLeft, ClipboardCopy, Menu, Truck, Building2, Database
 } from 'lucide-react';
 
 export {
@@ -64,7 +65,8 @@ export {
   DollarSign as DiariaIcon, Archive as StockIcon, LogOut as LogoutIcon, ChevronDown as ChevronDownIcon, Menu as MenuIcon,
   ArrowLeft as ArrowLeftIcon, ClipboardCopy as CopyIcon,
   Archive as WhatsAppIcon, // Placeholder for WhatsApp icon
-  Building2 as AuthIcon
+  Building2 as AuthIcon,
+  Database as DatabaseIcon
 };
 
 

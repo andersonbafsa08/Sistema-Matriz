@@ -1,4 +1,3 @@
-/// <reference types="@testing-library/jest-dom" />
 // setupTests.ts
 import { afterEach, expect } from 'vitest';
 import { cleanup } from '@testing-library/react';
