@@ -1,14 +1,3 @@
-
-
-
-
-
-
-
-
-
-
-
 import React, { createContext, useContext, ReactNode, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Routes, Route, useNavigate, Link, useLocation, NavLink, Navigate } from 'react-router-dom';
@@ -322,8 +311,8 @@ const App: React.FC = () => {
             { name: 'stock_history', fetcher: () => supabase.from('stock_history').select('*'), dispatcher: (data: any) => setStockHistory(data as StockHistoryItem[]) },
             { name: 'veiculos', fetcher: () => supabase.from('veiculos').select('*'), dispatcher: (data: any) => setVehicles(data as Vehicle[]) },
             { name: 'diarias', fetcher: () => supabase.from('diarias').select('*'), dispatcher: (data: any) => setDiarias(data as Diaria[]) },
-            { name: 'stock_pdf_settings', fetcher: () => supabase.from('stock_pdf_settings').select('*').single(), dispatcher: (data: any) => data && dispatch(setStockPdfSettings(data as PdfSettings)) },
-            { name: 'diaria_settings', fetcher: () => supabase.from('diaria_settings').select('*').single(), dispatcher: (data: any) => data && dispatch(setDiariaSettings(data as DiariaSettings)) },
+            { name: 'stock_pdf_settings', fetcher: () => supabase.from('stock_pdf_settings').select('*').maybeSingle(), dispatcher: (data: any) => setStockPdfSettings(data as PdfSettings) },
+            { name: 'diaria_settings', fetcher: () => supabase.from('diaria_settings').select('*').maybeSingle(), dispatcher: (data: any) => setDiariaSettings(data as DiariaSettings) },
         ];
     
         const loadInitialData = async () => {
@@ -334,11 +323,21 @@ const App: React.FC = () => {
             results.forEach((result, index) => {
                 const config = tableConfigs[index];
                 if (result.status === 'fulfilled') {
+                    // Note: .maybeSingle() does not produce an error for 0 rows, it returns null data.
                     if (result.value.error) {
                         handleError(result.value.error, `carregar dados da tabela '${config.name}'`);
                         hadError = true;
                     } else {
-                        dispatch(config.dispatcher(result.value.data));
+                        const data = result.value.data;
+                         // For settings tables using maybeSingle(), data is an object or null
+                        if (config.name === 'stock_pdf_settings' || config.name === 'diaria_settings') {
+                            if (data) {
+                                dispatch(config.dispatcher(data));
+                            }
+                        } else {
+                            // For other tables, data is an array
+                            dispatch(config.dispatcher(data));
+                        }
                     }
                 } else {
                     handleError(result.reason, `carregar dados da tabela '${config.name}'`);
