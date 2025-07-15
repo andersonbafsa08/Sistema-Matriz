@@ -1,3 +1,5 @@
+
+
 import React, { createContext, useContext, ReactNode, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Routes, Route, useNavigate, Link, useLocation, NavLink, Navigate } from 'react-router-dom';
@@ -229,14 +231,14 @@ export const CopyableField: React.FC<CopyableFieldProps> = ({ value, label, pref
 };
 
 // LAZY LOADED MODULES
-const AuthModule = lazy(() => import('/components/auth/AuthModule.tsx'));
-const ClientModule = lazy(() => import('/components/ClientModule.tsx'));
-const RequestModule = lazy(() => import('/components/RequestModule.tsx'));
-const CollaboratorModule = lazy(() => import('/components/CollaboratorModule.tsx'));
-const SettingsModule = lazy(() => import('/components/SettingsModule.tsx'));
-const StockControlModule = lazy(() => import('/components/StockControlModule.tsx'));
-const FleetModule = lazy(() => import('/components/FleetModule.tsx'));
-const DiariaModule = lazy(() => import('/components/DiariaModule.tsx'));
+const AuthModule = lazy(() => import('./components/auth/AuthModule'));
+const ClientModule = lazy(() => import('./components/ClientModule'));
+const RequestModule = lazy(() => import('./components/RequestModule'));
+const CollaboratorModule = lazy(() => import('./components/CollaboratorModule'));
+const SettingsModule = lazy(() => import('./components/SettingsModule'));
+const StockControlModule = lazy(() => import('./components/StockControlModule'));
+const FleetModule = lazy(() => import('./components/FleetModule'));
+const DiariaModule = lazy(() => import('./components/DiariaModule'));
 
 const App: React.FC = () => {
     const dispatch: AppDispatch = useDispatch();
