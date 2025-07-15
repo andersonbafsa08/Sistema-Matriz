@@ -3,13 +3,10 @@ import React, { useState, useCallback } from 'react';
 import { Modal, CopyIcon, XIcon, AlertTriangle } from '../../App';
 import { AddNotificationType } from '../../types';
 
-// Hardcoded data for unindexed keys from a previous prompt
+
 const unindexedKeys = [
-    { table: 'clientes', fkey: 'clientes_user_id_fkey', column: 'user_id' },
     { table: 'colaboradores', fkey: 'colaboradores_user_id_fkey', column: 'user_id' },
-    { table: 'diarias', fkey: 'diarias_user_id_fkey', column: 'user_id' },
     { table: 'historico', fkey: 'historico_user_id_fkey', column: 'user_id' },
-    { table: 'hoteis', fkey: 'hoteis_client_id_fkey', column: 'client_id' },
     { table: 'hoteis', fkey: 'hoteis_user_id_fkey', column: 'user_id' },
     { table: 'rotas', fkey: 'rotas_user_id_fkey', column: 'user_id' },
     { table: 'solicitacoes', fkey: 'solicitacoes_user_id_fkey', column: 'user_id' },
@@ -18,61 +15,18 @@ const unindexedKeys = [
     { table: 'veiculos', fkey: 'veiculos_user_id_fkey', column: 'user_id' }
 ];
 
-// Hardcoded data from the new CSV prompt for RLS issues
-const rlsPolicyIssues = [
-  { table: 'clientes', policyName: 'Enable read access for own data' },
-  { table: 'clientes', policyName: 'Enable insert for authenticated users' },
-  { table: 'clientes', policyName: 'Enable update for own data' },
-  { table: 'clientes', policyName: 'Enable delete for own data' },
-  { table: 'colaboradores', policyName: 'Enable read access for own data' },
-  { table: 'colaboradores', policyName: 'Enable insert for authenticated users' },
-  { table: 'colaboradores', policyName: 'Enable update for own data' },
-  { table: 'colaboradores', policyName: 'Enable delete for own data' },
-  { table: 'diaria_settings', policyName: 'Enable read access for own data' },
-  { table: 'diaria_settings', policyName: 'Enable insert for authenticated users' },
-  { table: 'diaria_settings', policyName: 'Enable update for own data' },
-  { table: 'diaria_settings', policyName: 'Enable delete for own data' },
-  { table: 'diarias', policyName: 'Enable read access for own data' },
-  { table: 'diarias', policyName: 'Enable insert for authenticated users' },
-  { table: 'diarias', policyName: 'Enable update for own data' },
-  { table: 'diarias', policyName: 'Enable delete for own data' },
-  { table: 'historico', policyName: 'Enable read access for own data' },
-  { table: 'historico', policyName: 'Enable insert for authenticated users' },
-  { table: 'historico', policyName: 'Enable update for own data' },
-  { table: 'historico', policyName: 'Enable delete for own data' },
-  { table: 'hoteis', policyName: 'Enable read access for own data' },
-  { table: 'hoteis', policyName: 'Enable insert for authenticated users' },
-  { table: 'hoteis', policyName: 'Enable update for own data' },
-  { table: 'hoteis', policyName: 'Enable delete for own data' },
-  { table: 'rotas', policyName: 'Enable read access for own data' },
-  { table: 'rotas', policyName: 'Enable insert for authenticated users' },
-  { table: 'rotas', policyName: 'Enable update for own data' },
-  { table: 'rotas', policyName: 'Enable delete for own data' },
-  { table: 'solicitacoes', policyName: 'Enable read access for own data' },
-  { table: 'solicitacoes', policyName: 'Enable insert for authenticated users' },
-  { table: 'solicitacoes', policyName: 'Enable update for own data' },
-  { table: 'solicitacoes', policyName: 'Enable delete for own data' },
-  { table: 'stock_history', policyName: 'Enable read access for own data' },
-  { table: 'stock_history', policyName: 'Enable insert for authenticated users' },
-  { table: 'stock_history', policyName: 'Enable update for own data' },
-  { table: 'stock_history', policyName: 'Enable delete for own data' },
-  { table: 'stock_items', policyName: 'Enable read access for own data' },
-  { table: 'stock_items', policyName: 'Enable insert for authenticated users' },
-  { table: 'stock_items', policyName: 'Enable update for own data' },
-  { table: 'stock_items', policyName: 'Enable delete for own data' },
-  { table: 'stock_pdf_settings', policyName: 'Enable read access for own data' },
-  { table: 'stock_pdf_settings', policyName: 'Enable insert for authenticated users' },
-  { table: 'stock_pdf_settings', policyName: 'Enable update for own data' },
-  { table: 'stock_pdf_settings', policyName: 'Enable delete for own data' },
-  { table: 'veiculos', policyName: 'Enable read access for own data' },
-  { table: 'veiculos', policyName: 'Enable insert for authenticated users' },
-  { table: 'veiculos', policyName: 'Enable update for own data' },
-  { table: 'veiculos', policyName: 'Enable delete for own data' }
+const unusedIndexes = [
+    { table: 'clientes', indexName: 'clientes_user_id_idx' },
+    { table: 'hoteis', indexName: 'hoteis_client_id_idx' }
 ];
 
-const generateSqlStatement = (item: typeof unindexedKeys[0]) => {
+const generateCreateIndexSql = (item: typeof unindexedKeys[0]) => {
     const indexName = `${item.table}_${item.column}_idx`;
     return `CREATE INDEX CONCURRENTLY "${indexName}" ON "public"."${item.table}" USING btree ("${item.column}");`;
+};
+
+const generateDropIndexSql = (item: typeof unusedIndexes[0]) => {
+    return `DROP INDEX CONCURRENTLY IF EXISTS "public"."${item.indexName}";`;
 };
 
 
@@ -117,27 +71,31 @@ const DatabaseHealthCheck: React.FC<DatabaseHealthCheckProps> = ({ addNotificati
                     Os seguintes problemas de performance foram identificados. Siga as instruções para corrigi-los e melhorar a performance do sistema.
                 </p>
 
-                {/* Section for RLS Policy Issues */}
-                <div className="border rounded-lg overflow-hidden bg-gray-50 p-4">
-                    <h4 className="font-semibold text-gray-800 text-lg mb-2">Performance de Políticas RLS</h4>
+                {/* Section for Unused Indexes */}
+                <div className="border rounded-lg overflow-hidden bg-gray-50 p-4 mt-6">
+                    <h4 className="font-semibold text-gray-800 text-lg mb-2">Índices Não Utilizados</h4>
                     <p className="text-sm text-gray-600 mb-4">
-                        As políticas abaixo são ineficientes. Para corrigi-las, vá para a seção <a href="https://supabase.com/dashboard/project/_/auth/policies" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">Authentication &gt; Policies</a> do seu painel Supabase, encontre a política e edite sua expressão. Envolva a chamada de função (ex: <code className="text-xs bg-gray-200 p-1 rounded">auth.uid()</code>) em um <code className="text-xs bg-gray-200 p-1 rounded">SELECT</code> (ex: <code className="text-xs bg-gray-200 p-1 rounded">(select auth.uid())</code>).
-                        <a href="https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium ml-2">Saiba mais.</a>
+                        Os índices abaixo nunca foram utilizados e podem ser removidos para economizar espaço e melhorar o desempenho de escrita. Gere o comando SQL para remover o índice.
+                        <a href="https://supabase.com/docs/guides/database/database-linter?lint=0005_unused_index" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium ml-2">Saiba mais.</a>
                     </p>
                     <ul className="divide-y divide-gray-200 border rounded-lg overflow-hidden">
-                        {rlsPolicyIssues.map((item, index) => (
-                             <li key={`rls-${index}`} className="p-3 flex justify-between items-center bg-white">
+                        {unusedIndexes.map((item, index) => (
+                            <li key={`unused-${index}`} className="p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white">
                                 <div className="flex items-start">
-                                    <AlertTriangle className="text-orange-500 mr-3 mt-1 flex-shrink-0" size={18} />
+                                    <AlertTriangle className="text-purple-500 mr-3 mt-1 flex-shrink-0" size={18} />
                                     <div>
-                                        <p className="text-sm text-gray-800">
-                                            Tabela: <code className="bg-gray-100 p-1 rounded text-xs">{item.table}</code>
-                                        </p>
-                                        <p className="font-semibold text-gray-600 text-sm">
-                                           Política: <span className="text-indigo-600">{item.policyName}</span>
+                                        <p className="font-semibold text-gray-800 text-sm">Índice não utilizado</p>
+                                        <p className="text-sm text-gray-600">
+                                            Tabela: <code className="bg-gray-100 p-1 rounded text-xs">{item.table}</code>, Índice: <code className="bg-gray-100 p-1 rounded text-xs">{item.indexName}</code>
                                         </p>
                                     </div>
                                 </div>
+                                <button
+                                    onClick={() => setSqlToCopy(generateDropIndexSql(item))}
+                                    className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg text-sm w-full sm:w-auto flex-shrink-0"
+                                >
+                                    Gerar Comando
+                                </button>
                             </li>
                         ))}
                     </ul>
@@ -162,7 +120,7 @@ const DatabaseHealthCheck: React.FC<DatabaseHealthCheckProps> = ({ addNotificati
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => setSqlToCopy(generateSqlStatement(item))}
+                                    onClick={() => setSqlToCopy(generateCreateIndexSql(item))}
                                     className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg text-sm w-full sm:w-auto flex-shrink-0"
                                 >
                                     Gerar Correção
