@@ -20,6 +20,20 @@ const unusedIndexes = [
     { table: 'hoteis', indexName: 'hoteis_client_id_idx' }
 ];
 
+const inefficientRlsPolicies = [
+    { table: 'clientes' },
+    { table: 'hoteis' },
+    { table: 'colaboradores' },
+    { table: 'solicitacoes' },
+    { table: 'historico' },
+    { table: 'veiculos' },
+    { table: 'diarias' },
+    { table: 'stock_history' },
+    { table: 'rotas' },
+    { table: 'stock_items' }
+];
+
+
 const generateCreateIndexSql = (item: typeof unindexedKeys[0]) => {
     const indexName = `${item.table}_${item.column}_idx`;
     return `CREATE INDEX CONCURRENTLY "${indexName}" ON "public"."${item.table}" USING btree ("${item.column}");`;
@@ -29,12 +43,18 @@ const generateDropIndexSql = (item: typeof unusedIndexes[0]) => {
     return `DROP INDEX CONCURRENTLY IF EXISTS "public"."${item.indexName}";`;
 };
 
+const generateAlterPolicySql = (item: typeof inefficientRlsPolicies[0]) => {
+    const policyName = `policy_select_${item.table}`; // This is a guess. The user needs to replace it.
+    return `ALTER POLICY "${policyName}" ON "public"."${item.table}" WITH USING (( SELECT auth.uid() ) = user_id);`;
+};
 
-const SqlDisplay: React.FC<{ sql: string; onCopy: (sql: string) => void; onClose: () => void; }> = ({ sql, onCopy, onClose }) => {
+
+const SqlDisplay: React.FC<{ sql: string; onCopy: (sql: string) => void; onClose: () => void; isRls?: boolean }> = ({ sql, onCopy, onClose, isRls }) => {
     return (
         <div className="mt-4 p-4 border-t border-gray-200">
              <h3 className="font-semibold text-lg mb-2">Correção SQL Gerada</h3>
              <p className="text-sm mb-2">Copie o comando abaixo e cole no <a href="https://supabase.com/dashboard/project/_/sql" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Editor SQL do Supabase</a>.</p>
+             {isRls && <p className="text-sm mb-2 text-yellow-700 bg-yellow-50 p-2 rounded-lg"><strong>Atenção:</strong> O nome da política (`{`policy_select_...`}`) é uma suposição. Verifique e substitua pelo nome real da sua política antes de executar.</p>}
              <div className="bg-gray-800 text-white p-4 rounded-lg font-mono text-sm overflow-x-auto relative">
                  <code>{sql}</code>
                  <button onClick={() => onCopy(sql)} className="absolute top-2 right-2 bg-gray-700 hover:bg-gray-600 p-2 rounded-md" title="Copiar SQL">
@@ -58,11 +78,17 @@ interface DatabaseHealthCheckProps {
 
 const DatabaseHealthCheck: React.FC<DatabaseHealthCheckProps> = ({ addNotification, onClose }) => {
     const [sqlToCopy, setSqlToCopy] = useState<string | null>(null);
+    const [isRlsSql, setIsRlsSql] = useState(false);
 
     const copyToClipboard = useCallback((sql: string) => {
         navigator.clipboard.writeText(sql);
         addNotification('SQL copiado para a área de transferência!', 'success');
     }, [addNotification]);
+
+    const handleSetSql = (sql: string, isRls: boolean = false) => {
+        setSqlToCopy(sql);
+        setIsRlsSql(isRls);
+    };
     
     return (
         <Modal title="Diagnóstico da Base de Dados" onClose={onClose} modalContentClassName="max-w-4xl" zIndex={60}>
@@ -70,6 +96,36 @@ const DatabaseHealthCheck: React.FC<DatabaseHealthCheckProps> = ({ addNotificati
                 <p className="text-sm text-gray-600">
                     Os seguintes problemas de performance foram identificados. Siga as instruções para corrigi-los e melhorar a performance do sistema.
                 </p>
+
+                 {/* New RLS section */}
+                <div className="border rounded-lg overflow-hidden bg-gray-50 p-4 mt-6">
+                    <h4 className="font-semibold text-gray-800 text-lg mb-2">RLS (Row Level Security) Ineficiente</h4>
+                    <p className="text-sm text-gray-600 mb-4">
+                        As políticas de RLS que usam `auth.uid()` diretamente em comparações podem ser lentas. Envolvê-lo em uma subconsulta `(select auth.uid())` melhora drasticamente o desempenho.
+                        <a href="https://supabase.com/docs/guides/database/postgres/row-level-security#performance" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium ml-2">Saiba mais.</a>
+                    </p>
+                    <ul className="divide-y divide-gray-200 border rounded-lg overflow-hidden">
+                        {inefficientRlsPolicies.map((item, index) => (
+                            <li key={`rls-${index}`} className="p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white">
+                                <div className="flex items-start">
+                                    <AlertTriangle className="text-red-500 mr-3 mt-1 flex-shrink-0" size={18} />
+                                    <div>
+                                        <p className="font-semibold text-gray-800 text-sm">Política de RLS Otimizável</p>
+                                        <p className="text-sm text-gray-600">
+                                            Tabela: <code className="bg-gray-100 p-1 rounded text-xs">{item.table}</code>
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleSetSql(generateAlterPolicySql(item), true)}
+                                    className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg text-sm w-full sm:w-auto flex-shrink-0"
+                                >
+                                    Gerar Otimização
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
 
                 {/* Section for Unused Indexes */}
                 <div className="border rounded-lg overflow-hidden bg-gray-50 p-4 mt-6">
@@ -91,7 +147,7 @@ const DatabaseHealthCheck: React.FC<DatabaseHealthCheckProps> = ({ addNotificati
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => setSqlToCopy(generateDropIndexSql(item))}
+                                    onClick={() => handleSetSql(generateDropIndexSql(item))}
                                     className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-4 rounded-lg text-sm w-full sm:w-auto flex-shrink-0"
                                 >
                                     Gerar Comando
@@ -120,7 +176,7 @@ const DatabaseHealthCheck: React.FC<DatabaseHealthCheckProps> = ({ addNotificati
                                     </div>
                                 </div>
                                 <button
-                                    onClick={() => setSqlToCopy(generateCreateIndexSql(item))}
+                                    onClick={() => handleSetSql(generateCreateIndexSql(item))}
                                     className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg text-sm w-full sm:w-auto flex-shrink-0"
                                 >
                                     Gerar Correção
@@ -131,7 +187,7 @@ const DatabaseHealthCheck: React.FC<DatabaseHealthCheckProps> = ({ addNotificati
                 </div>
 
                 {sqlToCopy && (
-                     <SqlDisplay sql={sqlToCopy} onCopy={copyToClipboard} onClose={() => setSqlToCopy(null)} />
+                     <SqlDisplay sql={sqlToCopy} onCopy={copyToClipboard} onClose={() => { setSqlToCopy(null); setIsRlsSql(false); }} isRls={isRlsSql} />
                 )}
             </div>
         </Modal>
