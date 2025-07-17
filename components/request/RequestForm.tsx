@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../../src/store/store';
@@ -7,12 +8,12 @@ import {
     Request, Collaborator, AddNotificationType,
     requestFormSchema, RequestFormValidationErrors
 } from '../../types';
-import { addRequest as addRequestAction, updateRequest as updateRequestAction } from '../../src/store/slices/requestsSlice';
 import {
     Spinner, Modal, ChevronDown, ChevronUp, formatCnpjInput
 } from '../../App';
 import { getInitialRequestState } from '../../constants';
 import CollaboratorSelectionModalContent from './CollaboratorSelectionModalContent';
+import { supabase } from '../../src/supabaseClient';
 
 
 interface RequestFormProps {
@@ -117,7 +118,7 @@ const RequestForm: React.FC<RequestFormProps> = ({
         setShowCollabModal(false);
     }, []);
 
-    const handleSubmit = useCallback((e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
         setFormErrors(null);
@@ -137,7 +138,7 @@ const RequestForm: React.FC<RequestFormProps> = ({
             return;
         }
 
-        const dataToSave: Request = {
+        const dataForDb = {
             ...formData,
             ...validationResult.data,
             valor_total: Number(formData.valor_total),
@@ -147,31 +148,36 @@ const RequestForm: React.FC<RequestFormProps> = ({
             cnpj: (validationResult.data.cnpj || '').replace(/\D/g, ''),
             nf: validationResult.data.nf || '',
         };
+        // Remove ID for inserts, keep it for updates
+        const { id, ...dataToSave } = dataForDb;
 
         try {
-            const isActualEdit = !isPrefill && existingRequestProp?.id && solicitacoes.some(r => r.id === existingRequestProp.id);
+            const isActualEdit = !isPrefill && existingRequestProp?.id;
 
+            let error;
             if (isActualEdit) {
-                dispatch(updateRequestAction(dataToSave));
-                addNotification("Solicitação atualizada!", 'success');
+                const { error: updateError } = await supabase.from('solicitacoes').update(dataToSave).eq('id', existingRequestProp.id);
+                error = updateError;
             } else {
-                const newRequestWithProperId = {
-                    ...dataToSave,
-                    id: `req_${Date.now()}_${Math.random().toString(36).substring(7)}`
-                };
-                dispatch(addRequestAction(newRequestWithProperId));
-                addNotification("Nova solicitação salva!", 'success');
+                const { data: { user } } = await supabase.auth.getUser();
+                 if (!user) throw new Error("Usuário não autenticado.");
+                const { error: insertError } = await supabase.from('solicitacoes').insert({...dataToSave, user_id: user.id});
+                error = insertError;
             }
+
+            if (error) throw error;
+            
+            addNotification(isActualEdit ? "Solicitação atualizada!" : "Nova solicitação salva!", 'success');
             onFinished();
             setFormData(getInitialRequestState());
             setIsCollapsed(true);
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error saving request:", error);
-            addNotification("Erro ao salvar solicitação.", 'error');
+            addNotification(`Erro ao salvar solicitação: ${error.message}`, 'error');
         } finally {
             setIsSaving(false);
         }
-    }, [formData, isPrefill, existingRequestProp, solicitacoes, dispatch, addNotification, onFinished]);
+    }, [formData, isPrefill, existingRequestProp, dispatch, addNotification, onFinished]);
 
     const handleCancel = useCallback(() => {
         onFinished();
@@ -187,7 +193,7 @@ const RequestForm: React.FC<RequestFormProps> = ({
     return (
         <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200 sticky top-20 z-30 mb-8">
             <div className="flex justify-between items-center mb-4">
-                 <h3 className="text-xl font-bold text-gray-800">{isPrefill || !existingRequestProp?.id || !solicitacoes.some(r => r.id === existingRequestProp.id) ? 'Nova Solicitação' : 'Editar Solicitação'}</h3>
+                 <h3 className="text-xl font-bold text-gray-800">{isPrefill || !existingRequestProp?.id ? 'Nova Solicitação' : 'Editar Solicitação'}</h3>
                  <button onClick={toggleCollapse} className="p-2 rounded-full hover:bg-gray-200" aria-expanded={!isCollapsed} aria-controls="request-form-content">
                     {isCollapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
                  </button>
@@ -288,7 +294,7 @@ const RequestForm: React.FC<RequestFormProps> = ({
                         className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center min-w-[180px] min-h-[40px]"
                         disabled={isSaving}
                     >
-                        {isSaving ? <Spinner/> : (isPrefill || !solicitacoes.some(r => r.id === existingRequestProp?.id) ? "Salvar Solicitação" : "Atualizar Solicitação")}
+                        {isSaving ? <Spinner/> : (isPrefill || !existingRequestProp?.id ? "Salvar Solicitação" : "Atualizar Solicitação")}
                     </button>
                  </div>
             </form>

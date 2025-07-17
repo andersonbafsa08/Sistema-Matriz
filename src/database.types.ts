@@ -1,7 +1,4 @@
-
-
-
-import { Client, Hotel, Collaborator, Request, HistoryRequest, Rota, StockItem, StockHistoryItem, PdfSettings, Vehicle, Diaria, DiariaSettings } from "../types";
+import { Client, Hotel, Collaborator, Request, HistoryRequest, Rota, StockItem, StockHistoryItem, PdfSettings, Vehicle, Diaria, DiariaSettings, ClientObservacoes, AttachmentFile } from "../types";
 
 export type Json =
   | string
@@ -11,43 +8,11 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-// Copied from types.ts to make this file self-contained
-interface SupabaseBase {
-  id?: string;
-  created_at?: string;
-  user_id?: string;
-}
-
-export interface ClientObservacoes {
-  sismografia: string;
-  granulometria: string;
-  carro_tracado: string;
-  carro_passeio: string;
-  observacao: string;
-}
-
-export interface AttachmentFile {
-  name: string;
-  data: string;
-  type?: string;
-  size?: number;
-}
-// End of copied types
-
 export interface Database {
   public: {
     Tables: {
       clientes: {
-        Row: SupabaseBase & {
-          id: string;
-          cliente: string;
-          cidade: string;
-          distancia: string;
-          lat_final: string;
-          lon_final: string;
-          searchableKeywords: string[];
-          observacoes?: ClientObservacoes;
-        };
+        Row: Client;
         Insert: {
           cliente: string;
           cidade: string;
@@ -69,17 +34,7 @@ export interface Database {
         }>;
       };
       hoteis: {
-        Row: SupabaseBase & {
-          id: string;
-          client_id: string;
-          hotel: string;
-          cnpj: string;
-          telefone: string;
-          dados_pag: string;
-          quarto_ind: number;
-          quarto_dup: number;
-          quarto_tri: number;
-        };
+        Row: Hotel;
         Insert: {
           client_id: string;
           hotel: string;
@@ -103,20 +58,7 @@ export interface Database {
         }>;
       };
       colaboradores: {
-        Row: SupabaseBase & {
-          id: string;
-          nome: string;
-          cpf: string;
-          data_nasc: string;
-          pix: string;
-          banco: string;
-          telefone?: string;
-          filial?: string;
-          funcao?: 'Técnico' | 'Motorista' | 'Mangueirista' | 'Carreteiro' | 'Outros' | '';
-          funcao_outros?: string;
-          valor_diaria_custom?: number;
-          valor_pernoite_custom?: number;
-        };
+        Row: Collaborator;
         Insert: {
             nome: string;
             cpf: string;
@@ -146,26 +88,7 @@ export interface Database {
         }>;
       };
       solicitacoes: {
-        Row: SupabaseBase & {
-            id: string;
-            solicitante: string;
-            data_solicitacao: string;
-            centro_custo: string;
-            equipe_members: string;
-            quant_equipe: number;
-            hotel_name: string;
-            client_name: string;
-            check_in: string;
-            check_out: string;
-            quant_diarias: number;
-            valor_diaria: number;
-            valor_total: number;
-            pix: string;
-            cnpj: string;
-            nf: string; 
-            nf_attachments: AttachmentFile[]; 
-            pix_attachments: AttachmentFile[];
-        };
+        Row: Request;
         Insert: {
           solicitante: string;
           data_solicitacao: string;
@@ -207,27 +130,7 @@ export interface Database {
         }>;
       };
       historico: {
-        Row: SupabaseBase & {
-          id: string;
-          solicitante: string;
-          data_solicitacao: string;
-          centro_custo: string;
-          equipe_members: string;
-          quant_equipe: number;
-          hotel_name: string;
-          client_name: string;
-          check_in: string;
-          check_out: string;
-          quant_diarias: number;
-          valor_diaria: number;
-          valor_total: number;
-          pix: string; 
-          cnpj: string;
-          nf_number?: string; 
-          nf_attachments: AttachmentFile[];
-          pix_attachments: AttachmentFile[];
-          attachments_status: 0 | 1; 
-        };
+        Row: HistoryRequest;
         Insert: {
           solicitante: string;
           data_solicitacao: string;
@@ -271,18 +174,13 @@ export interface Database {
         }>;
       };
       rotas: {
-        Row: SupabaseBase & {
-            id: string;
-            filial: string;
-            default_latitude: string;
-            default_longitude: string;
-            isDefault: boolean;
-        };
+        Row: Rota;
         Insert: {
           filial: string;
           default_latitude: string;
           default_longitude: string;
           isDefault: boolean;
+          user_id?: string;
         };
         Update: Partial<{
           filial: string;
@@ -292,18 +190,14 @@ export interface Database {
         }>;
       };
       stock_items: {
-        Row: SupabaseBase & {
+        Row: StockItem;
+        Insert: {
           id: string;
           classe: 'UNIFORME' | 'EPI';
           tipo: string;
           tamanho: string;
           quantidade: number;
-        };
-        Insert: {
-          classe: 'UNIFORME' | 'EPI';
-          tipo: string;
-          tamanho: string;
-          quantidade: number;
+          user_id?: string;
         };
         Update: Partial<{
           classe: 'UNIFORME' | 'EPI';
@@ -313,20 +207,7 @@ export interface Database {
         }>;
       };
       stock_history: {
-        Row: SupabaseBase & {
-          id: string;
-          idColaborador: string;
-          nomeColaborador: string;
-          items: {
-            id: string;
-            classe: 'UNIFORME' | 'EPI';
-            tipo: string;
-            tamanho: string;
-            quantidade: number;
-          }[];
-          data: string;
-          receiptGeneratedAt?: string;
-        };
+        Row: StockHistoryItem;
         Insert: {
           idColaborador: string;
           nomeColaborador: string;
@@ -339,6 +220,7 @@ export interface Database {
           }[];
           data: string;
           receiptGeneratedAt?: string;
+          user_id?: string;
         };
         Update: Partial<{
           idColaborador: string;
@@ -355,15 +237,9 @@ export interface Database {
         }>;
       };
       stock_pdf_settings: {
-        Row: {
-            id?: number;
-            created_at?: string;
-            headerTitle: string;
-            branchName: string;
-            managerName: string;
-            logoURL: string;
-        };
+        Row: PdfSettings;
         Insert: {
+            id?: number;
             headerTitle: string;
             branchName: string;
             managerName: string;
@@ -377,16 +253,7 @@ export interface Database {
         }>;
       };
       veiculos: {
-        Row: SupabaseBase & {
-          id: string;
-          placa: string;
-          filial: string;
-          tipo: string;
-          modelo: string;
-          chassi: string;
-          ano: string;
-          isLocado?: boolean;
-        };
+        Row: Vehicle;
         Insert: {
           placa: string;
           filial: string;
@@ -408,25 +275,7 @@ export interface Database {
         }>;
       };
       diarias: {
-        Row: SupabaseBase & {
-            id: string;
-            solicitante: string;
-            idColaborador: string;
-            data_inicial: string;
-            data_final: string;
-            hora_inicial: string;
-            hora_final: string;
-            destino: string;
-            observacao: string;
-            centro_custo: string;
-            total_cafes: number;
-            total_almocos: number;
-            total_jantas: number;
-            total_pernoites: number;
-            valor_total_refeicoes: number;
-            valor_total_pernoites: number;
-            valor_total_geral: number;
-        };
+        Row: Diaria;
         Insert: {
             solicitante: string;
             idColaborador: string;
@@ -466,14 +315,9 @@ export interface Database {
         }>;
       };
       diaria_settings: {
-        Row: {
-            id?: number;
-            created_at?: string;
-            valor_diaria: number;
-            valor_pernoite: number;
-            valor_diaria_carreteiro: number;
-        };
+        Row: DiariaSettings;
         Insert: {
+            id?: number;
             valor_diaria: number;
             valor_pernoite: number;
             valor_diaria_carreteiro: number;

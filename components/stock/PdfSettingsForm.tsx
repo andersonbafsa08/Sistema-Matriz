@@ -1,9 +1,11 @@
+
+
 import React, { useState, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../../src/store/store';
 import { PdfSettings, AddNotificationType } from '../../types';
-import { updateStockPdfSettings } from '../../src/store/slices/stockSettingsSlice';
 import { Spinner, Upload } from '../../App';
+import { supabase } from '../../src/supabaseClient';
 
 interface PdfSettingsFormProps {
     currentSettings: PdfSettings;
@@ -34,13 +36,22 @@ const PdfSettingsForm: React.FC<PdfSettingsFormProps> = ({ currentSettings, addN
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
-        dispatch(updateStockPdfSettings(settings));
-        addNotification("Configurações do PDF salvas!", "success");
-        setIsSaving(false);
-        onFinished();
+        try {
+            const payload = { ...settings, id: 1 };
+            const { error } = await supabase.from('stock_pdf_settings').upsert(payload);
+            if (error) throw error;
+            
+            // The Redux update will be handled by the realtime subscription.
+            addNotification("Configurações do PDF salvas!", "success");
+            onFinished();
+        } catch(error: any) {
+            addNotification(`Erro ao salvar configurações do PDF: ${error.message}`, "error");
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (

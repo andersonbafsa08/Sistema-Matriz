@@ -1,12 +1,12 @@
 
+
 import React, { useState, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../../src/store/store';
 import { StockHistoryItem, Collaborator, AddNotificationType } from '../../types';
 import { FileText, Edit, Trash2, Modal, Spinner, Eye, ChevronsRight } from '../../App';
 import { generateReceiptPdf } from '../../src/utils/pdfUtils';
-import { deleteStockHistoryEntry, updateStockHistoryEntry } from '../../src/store/slices/stockHistorySlice';
-import { updateStockQuantities } from '../../src/store/slices/stockSlice';
+import { supabase } from '../../src/supabaseClient';
 
 // Edit Form Component (now internal to the modal)
 const EditExitForm: React.FC<{
@@ -58,37 +58,56 @@ const EditExitForm: React.FC<{
         setEditedItems(currentItems => currentItems.filter(i => i.id !== itemIdToRemove));
     }, []);
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         setIsSaving(true);
         const finalItems = editedItems.filter(i => i.quantidade > 0);
         
-        const stockUpdates: { id: string; quantityChange: number }[] = [];
-        const allItemIds = new Set([...historyItem.items.map(i => i.id), ...editedItems.map(i => i.id)]);
-        
-        allItemIds.forEach(id => {
-            const originalQty = historyItem.items.find(i => i.id === id)?.quantidade || 0;
-            const editedQty = editedItems.find(i => i.id === id)?.quantidade || 0;
-            const quantityDelta = originalQty - editedQty; // Positive if items were returned, negative if more were taken
-            if (quantityDelta !== 0) {
-                stockUpdates.push({ id, quantityChange: quantityDelta });
+        try {
+            // Calculate stock adjustments
+            const stockUpdates: { id: string; quantityChange: number }[] = [];
+            const allItemIds = new Set([...historyItem.items.map(i => i.id), ...editedItems.map(i => i.id)]);
+            
+            allItemIds.forEach(id => {
+                const originalQty = historyItem.items.find(i => i.id === id)?.quantidade || 0;
+                const editedQty = editedItems.find(i => i.id === id)?.quantidade || 0;
+                const quantityDelta = originalQty - editedQty; // Positive if items were returned, negative if more were taken
+                if (quantityDelta !== 0) {
+                    stockUpdates.push({ id, quantityChange: quantityDelta });
+                }
+            });
+
+            // Apply stock adjustments
+            if (stockUpdates.length > 0) {
+                const stockUpdatePromises = stockUpdates.map(update => {
+                    const currentItem = stock.find(s => s.id === update.id);
+                    if (!currentItem) throw new Error(`Item de estoque ${update.id} não encontrado.`);
+                    const newQuantity = currentItem.quantidade + update.quantityChange;
+                    return supabase.from('stock_items').update({ quantidade: newQuantity }).eq('id', update.id);
+                });
+                const results = await Promise.all(stockUpdatePromises);
+                const stockError = results.find(res => res.error);
+                if (stockError) throw stockError.error;
             }
-        });
 
-        if (stockUpdates.length > 0) {
-            dispatch(updateStockQuantities(stockUpdates));
+            // Update or delete history record
+            if (finalItems.length === 0) {
+                const { error } = await supabase.from('stock_history').delete().eq('id', historyItem.id);
+                if (error) throw error;
+                addNotification("Saída removida e estoque restaurado.", "success");
+            } else {
+                const updatedHistoryItemPayload = { items: finalItems, data: new Date().toISOString() };
+                const { error } = await supabase.from('stock_history').update(updatedHistoryItemPayload).eq('id', historyItem.id);
+                if (error) throw error;
+                addNotification("Registro de saída atualizado!", "success");
+            }
+
+            onFinished();
+
+        } catch (error: any) {
+             addNotification(`Erro ao atualizar saída: ${error.message}`, "error");
+        } finally {
+            setIsSaving(false);
         }
-
-        if (finalItems.length === 0) {
-            dispatch(deleteStockHistoryEntry(historyItem.id));
-            addNotification("Saída removida e estoque restaurado.", "success");
-        } else {
-            const updatedHistoryItem: StockHistoryItem = { ...historyItem, items: finalItems, data: new Date().toISOString() };
-            dispatch(updateStockHistoryEntry(updatedHistoryItem));
-            addNotification("Registro de saída atualizado!", "success");
-        }
-
-        setIsSaving(false);
-        onFinished();
     };
 
     return (
@@ -190,7 +209,7 @@ const CollaboratorExitsModal: React.FC<{
         setEditingHistoryItem(null);
     }, []);
     
-    const handleGeneratePdf = useCallback((options: { type: 'UNIFORME' | 'EPI' | 'AMBOS', period: { start: string, end: string } }) => {
+    const handleGeneratePdf = useCallback(async (options: { type: 'UNIFORME' | 'EPI' | 'AMBOS', period: { start: string, end: string } }) => {
         const hasPeriodFilter = !!(options.period.start || options.period.end);
         
         // If a period is specified, consider all history items. Otherwise, only unreceipted items.
@@ -238,12 +257,17 @@ const CollaboratorExitsModal: React.FC<{
         const generationTimestamp = new Date().toISOString();
         const historyIdsToUpdate = [...new Set(filteredItemsByType.map(i => i.historyId))];
 
-        historyIdsToUpdate.forEach(id => {
-            const originalItem = currentHistoryItems.find(h => h.id === id);
-            if (originalItem) {
-                 dispatch(updateStockHistoryEntry({ ...originalItem, receiptGeneratedAt: generationTimestamp }));
-            }
-        });
+        const updatePromises = historyIdsToUpdate.map(id => 
+            supabase.from('stock_history').update({ receiptGeneratedAt: generationTimestamp }).eq('id', id)
+        );
+
+        try {
+            const results = await Promise.all(updatePromises);
+            const error = results.find(res => res.error);
+            if (error) throw error.error;
+        } catch(e: any) {
+            addNotification(`Erro ao marcar recibos como gerados: ${e.message}`, 'error');
+        }
 
     }, [currentHistoryItems, collaborator, pdfSettings, addNotification, dispatch]);
 

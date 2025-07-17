@@ -1,10 +1,11 @@
+
+
 import React, { useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../../src/store/store';
 import { AddNotificationType, StockItem, StockHistoryItem } from '../../types';
 import { useForm, Spinner } from '../../App';
-import { updateStockItem } from '../../src/store/slices/stockSlice';
-import { addStockHistoryEntry } from '../../src/store/slices/stockHistorySlice';
+import { supabase } from '../../src/supabaseClient';
 
 interface EntryFormProps {
     onFinished: () => void;
@@ -24,7 +25,7 @@ const EntryForm: React.FC<EntryFormProps> = ({ onFinished, addNotification, item
     });
     const [isSaving, setIsSaving] = useState(false);
 
-    const handleSubmit = useCallback((e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         const { classe, tipo, quantidade } = formData;
         let { tamanho } = formData; // Make it mutable
@@ -44,37 +45,53 @@ const EntryForm: React.FC<EntryFormProps> = ({ onFinished, addNotification, item
         const upperCaseTamanho = tamanho.trim().toUpperCase();
         const id = `${classe.toLowerCase()}-${upperCaseTipo.toLowerCase().replace(/\s+/g, '-')}-${upperCaseTamanho.toLowerCase()}`;
         
-        const existingItem = stock.find(item => item.id === id);
-        const newQuantity = (existingItem ? existingItem.quantidade : 0) + Number(quantidade);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Usuário não autenticado.");
 
-        const stockItem: StockItem = {
-            id,
-            classe,
-            tipo: upperCaseTipo,
-            tamanho: upperCaseTamanho,
-            quantidade: newQuantity,
-        };
+            const existingItem = stock.find(item => item.id === id);
+            const newQuantity = (existingItem ? existingItem.quantidade : 0) + Number(quantidade);
 
-        dispatch(updateStockItem(stockItem));
-        
-        const historyEntry: StockHistoryItem = {
-            id: `unif_hist_entry_${Date.now()}`,
-            idColaborador: 'SYSTEM_ENTRY',
-            nomeColaborador: 'ENTRADA NO ESTOQUE',
-            data: new Date().toISOString(),
-            items: [{
-                id: stockItem.id,
-                classe: stockItem.classe,
-                tipo: stockItem.tipo,
-                tamanho: stockItem.tamanho,
-                quantidade: Number(quantidade),
-            }],
-        };
-        dispatch(addStockHistoryEntry(historyEntry));
+            const stockItemPayload: StockItem = {
+                id,
+                classe,
+                tipo: upperCaseTipo,
+                tamanho: upperCaseTamanho,
+                quantidade: newQuantity,
+                user_id: user.id
+            };
 
-        addNotification("Entrada registrada com sucesso!", "success");
-        setIsSaving(false);
-        onFinished();
+            const historyEntryPayload: StockHistoryItem = {
+                id: `unif_hist_entry_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+                idColaborador: 'SYSTEM_ENTRY',
+                nomeColaborador: 'ENTRADA NO ESTOQUE',
+                data: new Date().toISOString(),
+                items: [{
+                    id: stockItemPayload.id,
+                    classe: stockItemPayload.classe,
+                    tipo: stockItemPayload.tipo,
+                    tamanho: stockItemPayload.tamanho,
+                    quantidade: Number(quantidade),
+                }],
+                user_id: user.id
+            };
+
+            const { error: stockError } = await supabase.from('stock_items').upsert(stockItemPayload);
+            if (stockError) throw stockError;
+
+            const { error: historyError } = await supabase.from('stock_history').insert(historyEntryPayload);
+            if (historyError) throw historyError;
+
+            addNotification("Entrada registrada com sucesso!", "success");
+            onFinished();
+        } catch (error: any) {
+            addNotification(`Erro ao registrar entrada: ${error.message}`, "error");
+            // Here you might want to add logic to revert the stock update if history fails.
+            // For now, we just notify the user.
+        } finally {
+            setIsSaving(false);
+        }
+
     }, [formData, stock, dispatch, addNotification, onFinished, itemClass]);
 
     return (

@@ -1,9 +1,11 @@
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../../src/store/store';
 import { Rota, AddNotificationType } from '../../types';
-import { setRoutes } from '../../src/store/slices/routesSlice';
 import { Spinner, Plus, XIcon } from '../../App';
+import { supabase } from '../../src/supabaseClient';
 
 interface LocationFormProps {
     onFinished: () => void;
@@ -13,10 +15,11 @@ interface LocationFormProps {
 const LocationForm: React.FC<LocationFormProps> = ({ onFinished, addNotification }) => {
     const dispatch: AppDispatch = useDispatch();
     const rotasDataFromStore = useSelector((state: RootState) => state.routes.rotas);
-    const [localRotas, setLocalRotas] = useState<Rota[]>(JSON.parse(JSON.stringify(rotasDataFromStore)));
+    const [localRotas, setLocalRotas] = useState<Rota[]>([]);
     const [isSaving, setIsSaving] = useState(false);
 
     useEffect(() => {
+        // Deep copy to prevent direct mutation of Redux state
         setLocalRotas(JSON.parse(JSON.stringify(rotasDataFromStore)));
     }, [rotasDataFromStore]);
 
@@ -49,25 +52,41 @@ const LocationForm: React.FC<LocationFormProps> = ({ onFinished, addNotification
         }
     }, []);
 
-    const addRoute = useCallback(() => setLocalRotas(prev => [{ id: `rota_${Date.now()}`, filial: '', default_latitude: '', default_longitude: '', isDefault: prev.length === 0 }, ...prev]), []);
+    const addRoute = useCallback(() => setLocalRotas(prev => [{ id: `new_rota_${Date.now()}`, filial: '', default_latitude: '', default_longitude: '', isDefault: prev.length === 0 }, ...prev]), []);
     const removeRoute = useCallback((indexToRemove: number) => setLocalRotas(prev => prev.filter((_, index) => index !== indexToRemove)), []);
 
-    const handleSave = useCallback(() => {
+    const handleSave = useCallback(async () => {
         setIsSaving(true);
         for (const route of localRotas) { if (!route.filial.trim()) { addNotification("O nome da filial é obrigatório.", 'error'); setIsSaving(false); return; } }
         if (localRotas.length > 0 && !localRotas.some(r => r.isDefault)) { addNotification("Defina uma rota como padrão.", 'error'); setIsSaving(false); return; }
 
         try {
-            dispatch(setRoutes(localRotas));
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Usuário não autenticado.");
+
+            // This is a "replace all" operation for this user.
+            
+            // 1. Delete all existing routes for the current user
+            const { error: deleteError } = await supabase.from('rotas').delete().eq('user_id', user.id);
+            if (deleteError) throw deleteError;
+
+            // 2. Insert the new set of routes if any exist
+            if (localRotas.length > 0) {
+                 const routesToInsert = localRotas.map(({ id, created_at, user_id, ...rest }) => ({...rest, user_id: user.id}));
+                 const { error: insertError } = await supabase.from('rotas').insert(routesToInsert);
+                 if (insertError) throw insertError;
+            }
+            
+            // The redux state will be updated via the realtime subscription in App.tsx
             addNotification("Rotas salvas!", 'success');
             onFinished();
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error saving routes:", error);
-            addNotification("Erro ao salvar rotas.", "error");
+            addNotification(`Erro ao salvar rotas: ${error.message}`, "error");
         } finally {
             setIsSaving(false);
         }
-    }, [localRotas, dispatch, addNotification, onFinished]);
+    }, [localRotas, addNotification, onFinished]);
 
     return (
         <div className="flex flex-col h-full overflow-hidden"> {/* Ensures container adheres to modal structure */}

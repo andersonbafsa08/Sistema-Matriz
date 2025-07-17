@@ -1,11 +1,11 @@
 
+
 import React, { useState, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../../src/store/store';
 import { AddNotificationType, StockItem, StockHistoryItem, Collaborator } from '../../types';
 import { Spinner } from '../../App';
-import { updateStockQuantities } from '../../src/store/slices/stockSlice';
-import { addStockHistoryEntry } from '../../src/store/slices/stockHistorySlice';
+import { supabase } from '../../src/supabaseClient';
 
 interface ExitFormProps {
     onFinished: () => void;
@@ -79,7 +79,7 @@ const ExitForm: React.FC<ExitFormProps> = ({ onFinished, addNotification, itemCl
         setTempExitList(prev => prev.filter(item => item.id !== itemId));
     }, []);
 
-    const handleSubmit = useCallback((e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedCollaborator || tempExitList.length === 0) {
             addNotification("Selecione um colaborador e adicione pelo menos um item à lista.", "error");
@@ -93,27 +93,45 @@ const ExitForm: React.FC<ExitFormProps> = ({ onFinished, addNotification, itemCl
              return;
         }
 
-        const historyEntry: StockHistoryItem = {
-            id: `unif_hist_${Date.now()}`,
-            idColaborador: selectedCollaborator,
-            nomeColaborador: collaborator.nome,
-            data: new Date().toISOString(),
-            items: tempExitList,
-        };
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Usuário não autenticado.");
 
-        const stockUpdates = tempExitList.map(item => ({
-            id: item.id,
-            quantityChange: -item.quantidade
-        }));
+            const historyEntryPayload: StockHistoryItem = {
+                id: `unif_hist_${Date.now()}_${Math.random().toString(36).substring(7)}`,
+                idColaborador: selectedCollaborator,
+                nomeColaborador: collaborator.nome,
+                data: new Date().toISOString(),
+                items: tempExitList,
+                user_id: user.id
+            };
 
-        dispatch(addStockHistoryEntry(historyEntry));
-        dispatch(updateStockQuantities(stockUpdates));
+            // This should ideally be a transaction. Using Promise.all is the next best thing
+            // without a dedicated RPC function.
+            const stockUpdatePromises = tempExitList.map(itemToUpdate => {
+                const currentItem = stock.find(i => i.id === itemToUpdate.id);
+                if (!currentItem) throw new Error(`Item de estoque ${itemToUpdate.id} não encontrado.`);
+                const newQuantity = currentItem.quantidade - itemToUpdate.quantidade;
+                return supabase.from('stock_items').update({ quantidade: newQuantity }).eq('id', itemToUpdate.id);
+            });
+            
+            const results = await Promise.all(stockUpdatePromises);
+            const stockUpdateError = results.find(res => res.error);
+            if (stockUpdateError) throw stockUpdateError.error;
 
-        addNotification("Saída de itens registrada com sucesso!", "success");
-        setIsSaving(false);
-        onFinished();
+            const { error: historyError } = await supabase.from('stock_history').insert(historyEntryPayload);
+            if (historyError) throw historyError;
 
-    }, [selectedCollaborator, tempExitList, collaborators, dispatch, addNotification, onFinished]);
+            addNotification("Saída de itens registrada com sucesso!", "success");
+            onFinished();
+
+        } catch (error: any) {
+             addNotification(`Erro ao registrar saída: ${error.message}`, "error");
+        } finally {
+            setIsSaving(false);
+        }
+
+    }, [selectedCollaborator, tempExitList, collaborators, stock, addNotification, onFinished]);
 
     return (
          <form onSubmit={handleSubmit} className="space-y-6">

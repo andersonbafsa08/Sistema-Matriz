@@ -1,10 +1,11 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../../src/store/store';
 import { Client, ClientObservacoes, AddNotificationType } from '../../types';
-import { updateClient as updateClientAction } from '../../src/store/slices/clientsSlice';
 import { useForm, Spinner } from '../../App';
+import { supabase } from '../../src/supabaseClient';
 
 interface ObservacoesFormProps {
     client: Client;
@@ -42,22 +43,27 @@ const ObservacoesForm: React.FC<ObservacoesFormProps> = ({ client, onFinished, a
     }, [setFormDataState]);
 
 
-    const handleSubmit = useCallback((e: React.FormEvent) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
         try {
-            // formData already contains uppercase values due to handleChange
-            const updatedClient = { ...client, observacoes: formData };
-            dispatch(updateClientAction(updatedClient));
+            const { error } = await supabase
+                .from('clientes')
+                .update({ observacoes: formData })
+                .eq('id', client.id);
+
+            if (error) throw error;
+
+            // The Redux update will be handled by the realtime subscription.
             addNotification("Observações salvas com sucesso!", 'success');
             onFinished();
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error saving observations: ", error);
-            addNotification("Erro ao salvar observações.", 'error');
+            addNotification(`Erro ao salvar observações: ${error.message}`, 'error');
         } finally {
             setIsSaving(false);
         }
-    }, [client, formData, dispatch, addNotification, onFinished]);
+    }, [client, formData, addNotification, onFinished]);
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">

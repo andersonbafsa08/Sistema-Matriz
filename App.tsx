@@ -1,5 +1,6 @@
 
 
+
 import React, { createContext, useContext, ReactNode, useCallback, useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Routes, Route, useNavigate, Link, useLocation, NavLink, Navigate } from 'react-router-dom';
@@ -9,17 +10,17 @@ import {
     setPrefilledRequestDataReducer,
     clearPrefilledRequestDataReducer
 } from './src/store/slices/navigationSlice';
-import { setClients, clearClients } from './src/store/slices/clientsSlice';
-import { setHotels, clearHotels } from './src/store/slices/hotelsSlice';
-import { setCollaborators, clearCollaborators } from './src/store/slices/collaboratorsSlice';
-import { setRequests, clearRequests } from './src/store/slices/requestsSlice';
-import { setHistory, clearHistory } from './src/store/slices/historySlice';
-import { setRoutes, clearRoutes } from './src/store/slices/routesSlice';
-import { setStockItems, clearStock } from './src/store/slices/stockSlice';
-import { setStockHistory, clearStockHistory } from './src/store/slices/stockHistorySlice';
+import { setClients, clearClients, addClient, updateClient, deleteClientReducer } from './src/store/slices/clientsSlice';
+import { setHotels, clearHotels, addHotel, updateHotel, deleteHotelReducer } from './src/store/slices/hotelsSlice';
+import { setCollaborators, clearCollaborators, addCollaborator, updateCollaborator, deleteCollaboratorReducer } from './src/store/slices/collaboratorsSlice';
+import { setRequests, clearRequests, addRequest, updateRequest, deleteRequestReducer } from './src/store/slices/requestsSlice';
+import { setHistory, clearHistory, addHistoryItem, updateHistoryItem, deleteHistoryItemReducer } from './src/store/slices/historySlice';
+import { setRoutes, clearRoutes, addRoute, updateRoute, deleteRoute } from './src/store/slices/routesSlice';
+import { setStockItems, clearStock, addStockItem, updateStockItem, deleteStockItem } from './src/store/slices/stockSlice';
+import { setStockHistory, clearStockHistory, addStockHistoryEntry, updateStockHistoryEntry, deleteStockHistoryEntry } from './src/store/slices/stockHistorySlice';
 import { setStockPdfSettings, clearStockSettings } from './src/store/slices/stockSettingsSlice';
-import { setVehicles, clearFleet } from './src/store/slices/fleetSlice';
-import { setDiarias, clearDiarias } from './src/store/slices/diariasSlice';
+import { setVehicles, clearFleet, addVehicle, updateVehicle, deleteVehicleReducer } from './src/store/slices/fleetSlice';
+import { setDiarias, clearDiarias, addDiaria, updateDiaria, deleteDiaria } from './src/store/slices/diariasSlice';
 import { setDiariaSettings, clearDiariaSettings } from './src/store/slices/diariaSettingsSlice';
 import { setUserAndSession, clearAuth } from './src/store/slices/authSlice';
 
@@ -300,6 +301,70 @@ const App: React.FC = () => {
         return () => subscription.unsubscribe();
     }, [dispatch]);
 
+    const handleRealtimeUpdate = useCallback((payload: any) => {
+        const { table, eventType, new: newRecord, old: oldRecord } = payload;
+        console.log(`Realtime event: ${eventType} on ${table}`, payload);
+
+        switch (table) {
+            case 'clientes':
+                if (eventType === 'INSERT') dispatch(addClient(newRecord as Client));
+                else if (eventType === 'UPDATE') dispatch(updateClient(newRecord as Client));
+                else if (eventType === 'DELETE') dispatch(deleteClientReducer(oldRecord.id));
+                break;
+            case 'hoteis':
+                if (eventType === 'INSERT') dispatch(addHotel(newRecord as Hotel));
+                else if (eventType === 'UPDATE') dispatch(updateHotel(newRecord as Hotel));
+                else if (eventType === 'DELETE') dispatch(deleteHotelReducer(oldRecord.id));
+                break;
+            case 'colaboradores':
+                if (eventType === 'INSERT') dispatch(addCollaborator(newRecord as Collaborator));
+                else if (eventType === 'UPDATE') dispatch(updateCollaborator(newRecord as Collaborator));
+                else if (eventType === 'DELETE') dispatch(deleteCollaboratorReducer(oldRecord.id));
+                break;
+            case 'solicitacoes':
+                if (eventType === 'INSERT') dispatch(addRequest(newRecord as Request));
+                else if (eventType === 'UPDATE') dispatch(updateRequest(newRecord as Request));
+                else if (eventType === 'DELETE') dispatch(deleteRequestReducer(oldRecord.id));
+                break;
+            case 'historico':
+                if (eventType === 'INSERT') dispatch(addHistoryItem(newRecord as HistoryRequest));
+                else if (eventType === 'UPDATE') dispatch(updateHistoryItem(newRecord as HistoryRequest));
+                else if (eventType === 'DELETE') dispatch(deleteHistoryItemReducer(oldRecord.id));
+                break;
+            case 'rotas':
+                if (eventType === 'INSERT') dispatch(addRoute(newRecord as Rota));
+                else if (eventType === 'UPDATE') dispatch(updateRoute(newRecord as Rota));
+                else if (eventType === 'DELETE') dispatch(deleteRoute(oldRecord.id));
+                break;
+            case 'stock_items':
+                if (eventType === 'INSERT') dispatch(addStockItem(newRecord as StockItem));
+                else if (eventType === 'UPDATE') dispatch(updateStockItem(newRecord as StockItem));
+                else if (eventType === 'DELETE') dispatch(deleteStockItem(oldRecord.id));
+                break;
+            case 'stock_history':
+                if (eventType === 'INSERT') dispatch(addStockHistoryEntry(newRecord as StockHistoryItem));
+                else if (eventType === 'UPDATE') dispatch(updateStockHistoryEntry(newRecord as StockHistoryItem));
+                else if (eventType === 'DELETE') dispatch(deleteStockHistoryEntry(oldRecord.id));
+                break;
+            case 'veiculos':
+                if (eventType === 'INSERT') dispatch(addVehicle(newRecord as Vehicle));
+                else if (eventType === 'UPDATE') dispatch(updateVehicle(newRecord as Vehicle));
+                else if (eventType === 'DELETE') dispatch(deleteVehicleReducer(oldRecord.id));
+                break;
+            case 'diarias':
+                if (eventType === 'INSERT') dispatch(addDiaria(newRecord as Diaria));
+                else if (eventType === 'UPDATE') dispatch(updateDiaria(newRecord as Diaria));
+                else if (eventType === 'DELETE') dispatch(deleteDiaria(oldRecord.id));
+                break;
+            case 'stock_pdf_settings':
+                if (eventType === 'INSERT' || eventType === 'UPDATE') dispatch(setStockPdfSettings(newRecord as PdfSettings));
+                break;
+            case 'diaria_settings':
+                 if (eventType === 'INSERT' || eventType === 'UPDATE') dispatch(setDiariaSettings(newRecord as DiariaSettings));
+                break;
+        }
+    }, [dispatch]);
+
     // Data loading effect
     useEffect(() => {
         const tableConfigs = [
@@ -357,10 +422,10 @@ const App: React.FC = () => {
     
             const channels = tableConfigs.map(config => 
                 supabase.channel(`public:${config.name}`)
-                    .on('postgres_changes', { event: '*', schema: 'public', table: config.name }, (payload) => {
-                        console.log(`Change received on table ${config.name}, reloading all data.`, payload);
-                        loadInitialData();
-                    })
+                    .on('postgres_changes', 
+                        { event: '*', schema: 'public', table: config.name }, 
+                        handleRealtimeUpdate
+                    )
                     .subscribe((status, err) => {
                         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
                             handleError(err || new Error(`A subscrição em tempo real falhou com o status: ${status}`), `na subscrição da tabela '${config.name}'`);
@@ -374,7 +439,7 @@ const App: React.FC = () => {
                 });
             };
         }
-    }, [session, dispatch, addNotification, handleError]);
+    }, [session, dispatch, addNotification, handleError, handleRealtimeUpdate]);
 
     const handleLogout = async () => {
         const { error } = await supabase.auth.signOut();
