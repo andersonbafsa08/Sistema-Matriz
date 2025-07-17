@@ -54,7 +54,7 @@ const SqlDisplay: React.FC<{ sql: string; onCopy: (sql: string) => void; onClose
         <div className="mt-4 p-4 border-t border-gray-200">
              <h3 className="font-semibold text-lg mb-2">Correção SQL Gerada</h3>
              <p className="text-sm mb-2">Copie o comando abaixo e cole no <a href="https://supabase.com/dashboard/project/_/sql" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Editor SQL do Supabase</a>.</p>
-             {isRls && <p className="text-sm mb-2 text-yellow-700 bg-yellow-50 p-2 rounded-lg"><strong>Atenção:</strong> O nome da política (`{`policy_select_...`}`) é uma suposição. Verifique e substitua pelo nome real da sua política antes de executar.</p>}
+             {isRls && <p className="text-sm mb-2 text-yellow-700 bg-yellow-50 p-2 rounded-lg"><strong>Atenção:</strong> O nome da política (`policy_select_...`) é uma suposição. Verifique e substitua pelo nome real da sua política antes de executar.</p>}
              <div className="bg-gray-800 text-white p-4 rounded-lg font-mono text-sm overflow-x-auto relative">
                  <code>{sql}</code>
                  <button onClick={() => onCopy(sql)} className="absolute top-2 right-2 bg-gray-700 hover:bg-gray-600 p-2 rounded-md" title="Copiar SQL">
@@ -101,7 +101,7 @@ const DatabaseHealthCheck: React.FC<DatabaseHealthCheckProps> = ({ addNotificati
                 <div className="border rounded-lg overflow-hidden bg-gray-50 p-4 mt-6">
                     <h4 className="font-semibold text-gray-800 text-lg mb-2">RLS (Row Level Security) Ineficiente</h4>
                     <p className="text-sm text-gray-600 mb-4">
-                        As políticas de RLS que usam `auth.uid()` diretamente em comparações podem ser lentas. Envolvê-lo em uma subconsulta `(select auth.uid())` melhora drasticamente o desempenho.
+                        As políticas de RLS que usam \`auth.uid()\` diretamente em comparações podem ser lentas. Envolvê-lo em uma subconsulta \`(select auth.uid())\` melhora drasticamente o desempenho.
                         <a href="https://supabase.com/docs/guides/database/postgres/row-level-security#performance" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium ml-2">Saiba mais.</a>
                     </p>
                     <ul className="divide-y divide-gray-200 border rounded-lg overflow-hidden">
@@ -161,7 +161,7 @@ const DatabaseHealthCheck: React.FC<DatabaseHealthCheckProps> = ({ addNotificati
                 <div className="border rounded-lg overflow-hidden bg-gray-50 p-4 mt-6">
                      <h4 className="font-semibold text-gray-800 text-lg mb-2">Chaves Estrangeiras Sem Índice</h4>
                      <p className="text-sm text-gray-600 mb-4">
-                        A falta de um índice em uma chave estrangeira pode deixar as consultas lentas. Para corrigir, gere o comando SQL e execute-o no Editor SQL do seu painel Supabase. Usar `CONCURRENTLY` evita bloquear a tabela durante a criação do índice.
+                        A falta de um índice em uma chave estrangeira pode deixar as consultas lentas. Para corrigir, gere o comando SQL e execute-o no Editor SQL do seu painel Supabase. Usar \`CONCURRENTLY\` evita bloquear a tabela durante a criação do índice.
                      </p>
                     <ul className="divide-y divide-gray-200 border rounded-lg overflow-hidden">
                         {unindexedKeys.map((item, index) => (

@@ -512,7 +512,7 @@ const App: React.FC = () => {
 const MainAppLayout: React.FC<{ children: ReactNode; userEmail?: string; onLogout: () => void; onToggleSettings: () => void }> = ({ children, userEmail, onLogout, onToggleSettings }) => {
     const navigate = useNavigate();
     const location = useLocation();
-    const isSubPage = location.pathname.split('/').filter(Boolean).length > 1;
+    const isSubPage = location.pathname !== '/';
 
     return (
         <div className="flex h-screen bg-gray-100 font-sans">
@@ -539,7 +539,7 @@ const MainAppLayout: React.FC<{ children: ReactNode; userEmail?: string; onLogou
 
             <main className="flex-1 flex flex-col overflow-hidden">
                 <header className="flex justify-between items-center p-4 bg-white border-b shadow-sm">
-                    {isSubPage && <button onClick={() => navigate(-1)} className="flex items-center text-gray-600 hover:text-gray-900"><ArrowLeft size={20} className="mr-2"/> Voltar</button>}
+                    {isSubPage ? <button onClick={() => navigate(-1)} className="flex items-center text-gray-600 hover:text-gray-900"><ArrowLeft size={20} className="mr-2"/> Voltar</button> : <div/>}
                     <div className="flex-1"></div>
                     <button onClick={onToggleSettings} className="p-2 rounded-full hover:bg-gray-200" aria-label="Configurações"><SettingsIcon size={24} /></button>
                 </header>
